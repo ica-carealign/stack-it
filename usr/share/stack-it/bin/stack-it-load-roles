@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+
+BINDIR=$(dirname "$0")
+BINDIR=$(cd "$BINDIR"; pwd)
+
+DEFNDIR="$BINDIR/../role_definitions"
+
+cd "$DEFNDIR"
+for envname in *; do
+  if [[ -d "$envname" ]]; then
+    echo -n "Loading $envname... "
+    "$BINDIR/stack-it-parse-role" -d "$envname" -e "$envname" && echo "ok" || echo "NOT ok"
+  fi
+done
+
+# vim: set et ts=2 sw=2 :

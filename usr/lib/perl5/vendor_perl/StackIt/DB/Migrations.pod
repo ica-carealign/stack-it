@@ -1,0 +1,56 @@
+=head1 StackIt How-To
+
+=head2 Development
+
+    # Create a new migration
+    $ stack-it-migrations-create -e "create todo list"
+
+      CREATED
+          ~/stackit/data/migrations/20140710195002-create-todo-list.sql
+
+    # Put your DML or DML in the migration file
+    $ echo '
+        CREATE TABLE todo (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          job VARCHAR(100)
+        );
+      ' >> ~/stackit/data/migrations/20140710195002-create-todo-list.sql
+
+    # Migrate your development database.
+    $ stack-it-migrations-migrate
+
+      [     EXECUTE] 20140710195002-create-todo-list.sql    (0.023s)
+      [    COMPLETE] 1 migration performed                  (0.059s)
+
+    # Commit the migration file and the newly generated schema/seed files.  
+
+    git add ~/stackit/data/migrations/20140710195002-create-todo-list.sql
+    git add `find ~/stackit -name schema.sql -or -name seed.sql`
+    git commit
+
+=head2 Production
+
+    # Configure the production database connection.
+    cat /etc/stack-it/database-50-production.yml
+
+      production:
+        driver: mysql
+        username: stack_it
+        password: secretpassword
+        database: stack_it
+
+    # Run migrations and load the most recent role definitions.
+    /usr/share/stack-it/bin/stack-it-migrations-migrate -vr
+
+      [   DB EXISTS] stack_it                              (0.000s)
+      [        SKIP] 00000000000000-baseline.sql           (0.000s)
+      [        SKIP] 20140626174127-shorten-ci-name.sql    (0.000s)
+      [        SKIP] 20140627235631-fix-migration-name.sql (0.000s)
+      [     EXECUTE] 20140710195002-create-todo-list.sql   (0.025s)
+      [    COMPLETE] 1 migration performed                 (0.526s)
+      [    LOAD ENV] Integration                           (0.170s)
+      [    LOAD ENV] Puppet                                (0.057s)
+      [    LOAD ENV] QA                                    (0.161s)
+      [  LOAD ROLES] 21 roles loaded                       (0.000s)
+
+=head1 

@@ -1,0 +1,86 @@
+#!/usr/bin/env perl
+use strict;
+use warnings;
+
+use Data::Dumper;
+use DBI;
+use FindBin qw($Script);
+use Getopt::Long;
+
+sub usage {
+  my ($message) = @_;
+  my $usage = qq{
+    Usage: $Script [options]
+    Options:
+      -h     | --help            : show this help message
+      -e ENV | --environment ENV : load definitions into stack environment ENV
+      -d DIR | --directory DIR   : load definitions from DIR
+               --from-db         : load definitions from the database
+      -D     | --debug           : enable debugging
+  };
+  for ($usage) { s/^\s+//s; s/\s+$//s; s/^ {4}//mg }
+  if ($message) {
+    print STDERR "\n$message\n\n";
+  }
+  print STDERR "$usage\n\n";
+  exit(@_ ? 1 : 0);
+}
+
+Getopt::Long::Configure("bundling");
+
+my $DEBUG = 0;
+my ($directory, $environment, $fromDB, $uml);
+GetOptions(
+  'directory|d=s'   => \$directory,
+  'environment|e=s' => \$environment,
+  'from-db'         => \$fromDB,
+  'debug|D',        => \$DEBUG,
+  'help|h'          => sub { usage() },
+) || usage("Unrecognized option(s)");
+
+if (! ($fromDB xor $directory)) {
+  usage("Must specify either --from-db or --directory (but not both)");
+}
+if ($directory && !$environment) {
+  usage("Must specify either --environment with --directory");
+}
+
+require StackIt::DB::Collection::Stack::Role;
+require StackIt::DB::Config;
+
+my $DBH = StackIt::DB::Config->new->connect;
+
+my $collection = new StackIt::DB::Collection::Stack::Role(
+  'DBH' => $DBH
+);
+
+if($fromDB) {
+  $collection->Environment($environment) if($environment);
+  $collection->populateFromDB();
+} else {
+  $collection->Environment($environment);
+  $collection->JSONDir($directory);
+  $collection->populateFromJSON();
+
+  $collection->save();
+}
+
+$collection->generateUML();
+
+if($DEBUG) {
+  print $collection->UML . "\n";
+  print Dumper($collection) . "\n";
+}
+
+# This will print unfulfilled dependencies...
+foreach my $warning (@{$collection->Log->Warnings}) {
+  print 'WARNING:  ' . $warning . "\n";
+}
+
+foreach my $error (@{$collection->Log->Errors}) {
+  print 'ERROR:  ' . $error . "\n";
+}
+
+exit 0;
+
+# vim: set et ts=2 sw=2 :

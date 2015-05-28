@@ -1,0 +1,134 @@
+<div id="instanceOptionsWrapper" class="instanceOptionsWrapper" hidden>
+  <div>
+    <table class="table">
+      <thead>
+        <tr>
+          <td colspan="2">
+            <h1 data-bind="text: stackName"></h1>
+          </td>
+        </tr>
+      </thead>
+      <tbody data-bind="with: currentInstance">
+        <tr>
+          <td>Instance Name:</td>
+          <td>
+            <input id="instanceName"
+                   class="instanceTextCtl"
+                   data-bind="value: Instance.InstanceName,
+                              event: { keyup: InstanceNameOnChange }"/>
+          </td>
+        </tr>
+        <tr>
+          <td>OS:</td>
+          <td>
+            <select name="ImageID"
+                    class="instanceSelectCtl"
+                    data-bind="options:       OSs,
+                               value:         Instance.ImageID,
+                               optionsText:   'OSName',
+                               optionsValue:  'value',
+                               event:         { change: OSOnChange }">
+            </select>
+          </td>
+        </tr>
+        <tr>
+          <td>Key Name:</td>
+          <td>
+            <input class="instanceTextCtl" data-bind="value: Instance.KeyName" disabled/>
+          </td>
+        </tr>
+        <tr>
+          <td>Role:</td>
+          <td>
+            <select name="Role"
+                    class="instanceSelectCtl"
+                    data-bind="options:      Roles,
+                               value:        Instance.Role,
+                               optionsText:  'roleName',
+                               optionsValue: 'value',
+                               event:        { change: RoleOnChange },
+                               enable:       enableRoles">
+            </select>
+          </td>
+        </tr>
+        <tr>
+          <td>Version:</td>
+          <td>
+            <select name="Version"
+                    class="instanceSelectCtl"
+                    data-bind="options:      Versions,
+                               value:        Instance.Version,
+                               optionsText:  'versionName',
+                               optionsValue: 'value',
+                               enable:       enableVersions">
+            </select>
+          </td>
+        </tr>
+        <tr>
+          <td>Environment:</td>
+          <td>
+            <select name="Environment"
+                    class="instanceSelectCtl"
+                    data-bind="options:      Environments,
+                               value:        Instance.Environment,
+                               optionsText:  'environmentName',
+                               optionsValue: 'value',
+                               enable:       enableEnvironments">
+            </select>
+          </td>
+        </tr>
+        <tr>
+          <td>Instance Type:</td>
+          <td>
+            <select name="InstanceType"
+                    class="instanceSelectCtl"
+                    data-bind="options:      InstanceTypes,
+                               value:        Instance.InstanceType,
+                               optionsText:  'description',
+                               optionsValue: 'value'">
+            </select>
+          </td>
+        </tr>
+        <tr>
+          <td>Schedule:</td>
+          <td>
+            <select name="InstanceSchedule"
+                    class="instanceSelectCtl"
+                    data-bind="options:         Schedules,
+                               value:           Instance.ScheduleID,
+                               optionsText:     'description',
+                               optionsValue:    'value'">
+            </select>
+          </td>
+        </tr>
+        <tr>
+          <td>Volume Type:</td>
+          <td>
+            <select name="VolumeType"
+                    class="instanceSelectCtl"
+                    data-bind="options:         VolumeTypes,
+                               value:           Instance.VolumeType,
+                               optionsText:     'description',
+                               optionsValue:    'value'">
+            </select>
+          </td>
+        </tr>
+        <tr>
+          <td>Volume Size (GB):</td>
+          <td>
+            <input class="instanceTextCtl" data-bind="value: Instance.VolumeSize"/>
+          </td>
+        </tr>
+        <tr>
+          <td colspan="2">
+            <button id="instanceBackButton"
+                    type="button"
+                    data-bind="click: $parent.closeInstanceOptions">Back</button>
+          </td>
+        </tr>
+      </tbody>
+      <tfoot>
+      </tfoot>
+    </table>
+  </div>
+</div>

@@ -1,0 +1,276 @@
+#!/bin/bash
+
+shopt -s nocasematch
+
+usage() {
+    code="${1:-1}"
+    sed 's/^        //' <<EOF >&2
+        Usage: $(basename "$0") [OPTIONS]
+        Options:
+           -h            : show this help message
+           -n name       : computer name to assign to this machine
+           -U username   : username with rights to add computer to Active Directory
+           -P password   : AD password accompanying -U
+           -W workgroup  : short name of Windows domain (default $WORKGROUP)
+           -R realm      : long name of Windows domain (default $REALM)
+           -C controller : DNS name of AD domain controller (default $DC)
+           -O OU         : organizational unit to assign computer (default $AD_OU)
+EOF
+    exit $code
+}
+
+die() {
+    echo "$@" >&2
+    exit 1
+}
+
+prompt() {
+    question="$1"; shift
+    if [[ -z $INTERACTIVE ]]; then
+        echo ""
+    else
+        local answer
+        while [[ -z "$answer" ]]; do
+            echo -n "$question " > /dev/tty
+            read answer < /dev/tty
+        done
+        echo "$answer"
+    fi
+}
+
+# Assign defaults.
+# Workgroup and realm must be in ALL CAPS.
+WORKGROUP=WORKGROUP
+REALM=WORKGROUP.LOCAL
+DC=dc.domain.net
+AD_OU="/WORKGROUP/Servers/AWS"
+
+# These are the credentials of a user who has permissions to create a computer
+# in the domain.
+AD_PROV_USER=
+AD_PROV_PASS=
+
+LCREALM=$(echo "$REALM" | tr A-Z a-z)
+DC_IP=$(getent hosts "$DC" | cut -d' ' -f1)
+COMPUTERNAME=''
+FQDN=''
+COMPUTER_IP=$(/sbin/ip addr show dev eth0 | perl -lne 'print $1 if /^\s*inet ([\d.]+)/')
+TIMESTAMP=$(date +'%Y%m%d%H%M%S')
+REQUIRED_RPMS="authconfig curl krb5-workstation nscd ntp pam_krb5 samba-client samba-common sudo"
+RHEL_VERSION=$( (perl -lne 'print $1 if /(\d+)/' < /etc/redhat-release) 2>/dev/null)
+
+BOLD=`tput bold 2>/dev/null`
+RESET=`tput sgr0 2>/dev/null`
+INTERACTIVE=
+[[ -t 0 ]] && INTERACTIVE=1
+
+# Options that refer to things on the AD server are in UPPERCASE.
+# Local things are lower case.
+while getopts 'hU:P:W:R:C:O:n:' opt; do
+    case $opt in
+        h) usage 0;;
+        U) AD_PROV_USER="$OPTARG";;
+        P) AD_PROV_PASS="$OPTARG";;
+        W) WORKGROUP=$(echo "$OPTARG" | tr a-z A-Z);;
+        R) REALM=$(echo "$OPTARG" | tr a-z A-Z);;
+        C) DC="$OPTARG";;
+        O) AD_OU="$OPTARG";;
+        n) COMPUTERNAME="$OPTARG";;
+        *) usage;;
+    esac
+done
+
+if [[ -z "$AD_PROV_USER" ]]; then
+    AD_PROV_USER=$(prompt "Domain admin username:")
+fi
+if [[ -z "$AD_PROV_PASS" ]]; then
+    AD_PROV_PASS=$(prompt "Password:")
+fi
+if [[ -z "$AD_PROV_USER" || -z "$AD_PROV_PASS" ]]; then
+    echo "User and password are required (-U/-P)" >&2
+    usage
+fi
+if [[ -z "$COMPUTER_IP" ]]; then
+    die "Can't determine IP address of eth0, bailing out."
+fi
+if [[ -z "$DC_IP" ]]; then
+    die "Can't resolve IP for $DC, bailing out."
+fi
+if [[ -z "$COMPUTERNAME" ]]; then
+    COMPUTERNAME=$(prompt "What name should this computer have in the domain $REALM?")
+    COMPUTERNAME=$(echo "${COMPUTERNAME%$REALM}" | sed "s/\\.$REALM$//i" | tr A-Z a-z)
+fi
+if [[ -z "$COMPUTERNAME" ]]; then
+    die "Need a computer name to assign to this machine (-n option)"
+    usage
+else
+    FQDN="$(echo "$COMPUTERNAME.$REALM" | tr A-Z a-z)"
+fi
+
+NEED_RPMS=""
+for rpm in $REQUIRED_RPMS; do
+    if ! rpm -q "$rpm" > /dev/null; then
+        NEED_RPMS="$NEED_RPMS $rpm"
+    fi
+done
+
+if [[ -n "$NEED_RPMS" ]]; then
+  yum -y install $NEED_RPMS
+fi
+chkconfig winbind on
+chkconfig ntpd on
+
+FQDN="$FQDN" perl -w -lpi.bak -e '
+  if (s/^HOSTNAME=.*/HOSTNAME=$ENV{FQDN}/) { $changed++ }
+  if (eof && !$changed) { print "HOSTNAME=$ENV{FQDN}" }
+' /etc/sysconfig/network
+
+echo "$FQDN" > /etc/hostname
+hostname "$FQDN"
+
+if ! grep -q "$COMPUTER_IP.*$FQDN" /etc/hosts 2>/dev/null; then
+    echo "$COMPUTER_IP $FQDN $COMPUTERNAME" >> /etc/hosts
+fi
+if ! grep -q "$DC_IP.*$DC" /etc/hosts 2>/dev/null; then
+    echo "$DC_IP $DC" >> /etc/hosts
+fi
+
+if [[ -e /etc/profile.d/krb5-workstation.sh ]]; then
+    . /etc/profile.d/krb5-workstation.sh
+fi
+
+ntpdate "$DC"
+service ntpd restart
+
+AUTHCONFIG_OPTS_6="--enablemkhomedir --enablepamaccess"
+AUTHCONFIG_OPTS='$AUTHCONFIG_OPTS_'${RHEL_VERSION}
+
+authconfig \
+    --enablecache \
+    --enablewinbind \
+    --enablewinbindauth \
+    --smbsecurity=ads \
+    --smbworkgroup="$WORKGROUP" \
+    --smbrealm="$REALM" \
+    --smbidmapuid=10000-20000 \
+    --smbidmapgid=10000-20000 \
+    --enablewinbindusedefaultdomain \
+    --winbindtemplatehomedir="/home/$LCREALM/%U" \
+    --winbindtemplateshell=/bin/bash \
+    --winbindtemplateprimarygroup="Domain Users" \
+    --enablekrb5 \
+    --krb5realm="$REALM" \
+    --krb5kdc="$DC" \
+    --enablekrb5kdcdns \
+    --enablekrb5realmdns \
+    --enablelocauthorize \
+    $(eval "echo $AUTHCONFIG_OPTS") \
+    --updateall
+
+sed 's/^    //' <<EOF > /etc/krb5.conf
+    [logging]
+     default = FILE:/var/log/krb5libs.log
+     kdc = FILE:/var/log/krb5kdc.log
+     admin_server = FILE:/var/log/kadmind.log
+
+    [libdefaults]
+     default_realm = ICADEV.LOCAL
+     dns_lookup_realm = true
+     dns_lookup_kdc = true
+     ticket_lifetime = 24h
+     renew_lifetime = 7d
+     forwardable = yes
+
+    [realms]
+     ICADEV.LOCAL = {
+     }
+
+    [domain_realm]
+     icadev.local = ICADEV.LOCAL
+     .icadev.local = ICADEV.LOCAL
+
+    [appdefaults]
+     pam = {
+       debug = false
+       ticket_lifetime = 36000
+       renew_lifetime = 36000
+       forwardable = true
+       krb4_convert = false
+     }
+EOF
+
+# maybe use ktpass for this later.
+# http://technet.microsoft.com/en-us/library/cc753771.aspx
+if ! echo "$AD_PROV_PASS" | kinit "$AD_PROV_USER"; then
+    die "kinit failed, can't issue ticket-granting ticket. Bailing out."
+fi
+  
+if ! net ads join createcomputer="$AD_OU" -U "$AD_PROV_USER%$AD_PROV_PASS"; then
+    die "Can't join the domain."
+fi
+
+mkdir -p -m 0755 "/home/$LCREALM"
+
+echo '%linuxadmins ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
+
+cp -a /etc/pam.d/system-auth /etc/pam.d/system-auth.$TIMESTAMP
+
+sed 's/^    //' <<EOF > /etc/pam.d/system-auth
+    #%PAM-1.0
+    # This file is auto-generated.
+    # User changes will be destroyed the next time authconfig is run.
+    auth required pam_env.so
+    auth required pam_warn.so
+    auth sufficient pam_unix.so nullok try_first_pass
+    auth requisite pam_succeed_if.so uid >= 500 quiet
+    auth sufficient pam_krb5.so use_first_pass
+    auth sufficient pam_winbind.so cached_login use_first_pass
+    auth required pam_deny.so
+
+    account required pam_access.so
+    account required pam_unix.so broken_shadow
+    account [default=ignore success=1] pam_succeed_if.so uid < 10000 quiet
+    account [default=bad success=ignore] pam_succeed_if.so user ingroup linuxusers quiet
+    account sufficient pam_localuser.so
+    account sufficient pam_succeed_if.so uid < 500 quiet
+    account [default=bad success=ok user_unknown=ignore] pam_krb5.so
+    account required pam_permit.so
+
+    password requisite pam_cracklib.so try_first_pass retry=3
+    password sufficient pam_unix.so sha512 shadow nullok try_first_pass use_authtok
+    password sufficient pam_krb5.so use_authtok
+    password sufficient pam_winbind.so cached_login use_authtok
+    password required pam_deny.so
+
+    session required pam_mkhomedir.so skel=/etc/skel/ umask=0022
+    session optional pam_keyinit.so revoke
+    session required pam_limits.so
+    session [success=1 default=ignore] pam_succeed_if.so service in crond quiet use_uid
+    session required pam_unix.so
+    session optional pam_krb5.so
+EOF
+
+sed -i 's%protocols:  files%protocols:  files winbind%g' /etc/nsswitch.conf
+sed -i 's%rpc:        files%rpc:        files winbind%g' /etc/nsswitch.conf
+sed -i 's%netgroup:   files%netgroup:   files winbind%g' /etc/nsswitch.conf
+sed -i 's%automount:  files%automount:  files winbind%g' /etc/nsswitch.conf
+
+sed -i 's%   winbind offline logon = false%   winbind offline logon = true%g' /etc/samba/smb.conf
+
+# Add another global section at the end since it's easier than finding the section to edit.
+sed 's/^    //' <<EOF >> /etc/samba/smb.conf
+    [global]
+    winbind enum users = true
+    winbind enum groups = true
+    winbind cache time = 120
+EOF
+
+sed -i 's%;cached_login = no%cached_login = yes%g' /etc/security/pam_winbind.conf
+
+sed -i 's%PasswordAuthentication no%PasswordAuthentication yes%g' /etc/ssh/sshd_config
+
+service winbind restart
+service nscd restart
+service sshd restart
+
+# vim: set et ts=4 sw=4 sts=4 :

@@ -1,0 +1,68 @@
+<div data-bind="with: stackList">
+  <div class="page-header">
+    <a href="#" data-bind="click: $root.goToStackCreate" class="btn btn-primary">
+      <span class="glyphicon glyphicon-plus"></span>
+      New Stack
+    </a>
+    <h1>Current Stacks</h1>
+  </div>
+  <table id="stackList" class="stackList table table-hover">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Created</th>
+        <th class="center">AWS Status</th>
+        <th class="center">Puppet Build Status</th>
+        <th>Description</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody data-bind="foreach: json.Collection">
+      <tr data-bind="click: $root.goToStackInstanceList">
+        <td data-bind="text: StackName"></td>
+        <td data-bind="text: CreateTime"></td>
+        <td>
+        <!-- ko if: Status == 'CREATE_COMPLETE' -->
+          <span class="glyphicon glyphicon-ok-sign text-success center-block center click-glyph"
+                data-bind"click: $root.goToStackEventsList, clickBubble: false"></span>
+        <!-- /ko -->
+        <!-- ko if: Status == 'CREATE_IN_PROGRESS' -->
+          <span class="glyphicon glyphicon-question-sign text-primary center-block center click-glyph"
+                data-bind"click: $root.goToStackEventsList"></span>
+        <!-- /ko -->
+        <!-- ko if: Status == 'CREATE_FAILED' -->
+          <span class="glyphicon glyphicon-exclamation-sign text-danger center-block center click-glyph"
+                data-bind"click: $root.goToStackEventsList"></span>
+        <!-- /ko -->
+        <!-- ko ifnot: Status.indexOf('CREATE_') !== -1 -->
+          <span class="glyphicon glyphicon-exclamation-sign text-warning center-block center click-glyph"
+                data-bind"click: $root.goToStackEventsList"></span>
+        <!-- /ko -->
+        </td>
+        <td>
+        <!-- ko if: BuildStatus == 'success' -->
+          <span class="glyphicon glyphicon-ok-sign text-success center-block center"></span>
+        <!-- /ko -->
+        <!-- ko if: BuildStatus == 'pending' -->
+          <span class="glyphicon glyphicon-question-sign text-primary center-block center"></span>
+        <!-- /ko -->
+        <!-- ko if: BuildStatus == 'failed' -->
+          <span class="glyphicon glyphicon-exclamation-sign text-danger center-block center"></span>
+        <!-- /ko -->
+        </td>
+        <td data-bind="text: Description"></td>
+        <td class="actions">
+          <a href="#" class="btn btn-danger btn-xs" data-bind="click: $root.deleteStack">
+            <span class="glyphicon glyphicon-trash"></span>
+            Delete
+          </a>
+        </td>
+      </tr>
+    </tbody>
+    <tfoot>
+      <tr>
+        <td colspan="6"></td>
+      </tr>
+    </tfoot>
+  </table>
+</div>

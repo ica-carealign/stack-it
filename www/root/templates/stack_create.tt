@@ -1,0 +1,123 @@
+<div data-bind="with: createInstanceList">
+
+  <form class="form-inline" role="form" id="stackCreateWrapper">
+
+    <h1 id="stackCreateTitle" class="stackCreateTitle">New Stack</h1>
+
+    <div class="form-group stackEnvironment">
+      <label for="stackEnvironment">Add Full Stack</label>
+      <select name="StackEnvironment"
+              id="stackEnvironment"
+              class="instanceSelectCtl"
+              data-bind="options:      stackEnvironments,
+                         value:        stackEnvironment,
+                         optionsText:  'environmentName',
+                         optionsValue: 'value',
+                         event:        { change: StackEnvOnChange }">
+      </select>
+      <button class="btn btn-xs btn-default"
+              type="button"
+              data-bind="click: openStackOptions">Options</button>
+    </div>
+
+    <div class="form-group">
+      <label for="stackName">Stack Name</label>
+      <input id="stackName"
+             type="text"
+             maxlength=32
+             data-bind="value: stackName, 
+                        event: { keyup: StackNameOnChange }" />
+    </div>
+
+    <table id="stackCreate" class="stackCreate table">
+      <thead>
+        <tr>
+          <th class="actions"></th>
+          <th class="os">AMI</th>
+          <th class="role">Role</th>
+          <th class="version">Version</th>
+          <th class="environment">Environment</th>
+          <th class="actions"></th>
+        </tr>
+      </thead>
+      <tbody data-bind="foreach: instances, visible: instances().length > 0">
+        <tr>
+          <td>
+            <a href="#" class="btn btn-danger btn-xs" data-bind="click: $parent.removeInstance">
+              <span class="glyphicon glyphicon-trash"></span>
+              Delete
+            </a>
+          </td>
+          <td data-bind="click: $root.onChooseInstance" class="os">
+            <select name="ImageID"
+                    class="instanceSelectCtl"
+                    data-bind="options:       OSs,
+                               value:         Instance.ImageID,
+                               optionsText:   'OSName',
+                               optionsValue:  'value',
+                               event:         { change: OSOnChange }">
+            </select>
+          </td>
+          <td class="role">
+            <select name="Role"
+                    class="instanceSelectCtl"
+                    data-bind="options:      Roles,
+                               value:        Instance.Role,
+                               optionsText:  'roleName',
+                               optionsValue: 'value',
+                               event:        { change: RoleOnChange },
+                               enable:       enableRoles">
+            </select>
+          </td>
+          <td class="version">
+            <select name="Version"
+                    class="instanceSelectCtl"
+                    data-bind="options:      Versions,
+                               value:        Instance.Version,
+                               optionsText:  'versionName',
+                               optionsValue: 'value',
+                               event:        { change: VersionOnChange },
+                               enable:       enableVersions">
+            </select>
+          </td>
+          <td class="environment">
+            <select name="Environment"
+                    class="instanceSelectCtl"
+                    data-bind="options:      Environments,
+                               value:        Instance.Environment,
+                               optionsText:  'environmentName',
+                               optionsValue: 'value',
+                               enable:       enableEnvironments">
+            </select>
+          <td>
+            <button class="btn btn-xs btn-default"
+                    type="button"
+                    data-bind="click: $parent.openInstanceOptions">Options</button>
+          </td>
+        </tr>
+      </tbody>
+      <tfoot>
+        <tr>
+          <td colspan="6" align="center">
+            <button id="instanceAddButton"
+                    class="btn btn-default"
+                    type="button"
+                    data-bind="click: addInstance">Add</button>
+            <button id="stackCreateSubmit"
+                    class="btn btn-default"
+                    type="button"
+                    data-bind="click: submit">Submit</button>
+            <button class="btn btn-default"
+                    type="button"
+                    data-bind="click: cancelByBtn">Reset</button>
+          </td>
+        </tr>
+      </tfoot>
+    </table>
+
+  </form>
+
+  [% INCLUDE instance_options.tt %]
+  [% INCLUDE stack_options.tt %]
+
+</div>

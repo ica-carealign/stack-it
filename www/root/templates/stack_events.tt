@@ -1,0 +1,51 @@
+<div data-bind="with: stackEvents">
+  <div class="page-header">
+    <h1>Stack Events</h1>
+  </div>
+  <table id="stackEvents" class="stackEvents table table-hover">
+    <thead>
+      <tr>
+        <th>Timestamp</th>
+        <th class="center">Status</th>
+        <th>Type</th>
+        <th>Logical ID</th>
+        <th>Reason</th>
+      </tr>
+    </thead>
+    <tbody data-bind="foreach: json.Collection">
+      <tr>
+        <td data-bind="text: Timestamp"></td>
+        <td>
+          <!-- ko if: Status == 'CREATE_COMPLETE' -->
+            <span class="glyphicon glyphicon-ok-sign text-success center-block center"></span>
+            <!-- <div data-bind="text: Status" class="labelInvertSuccess"></div> -->
+          <!-- /ko -->
+          <!-- ko if: Status == 'CREATE_IN_PROGRESS' -->
+            <span class="glyphicon glyphicon-question-sign text-primary center-block center"></span>
+            <!-- <div data-bind="text: Status" class="labelInvertInProgress"></div> -->
+          <!-- /ko -->
+          <!-- ko if: Status == 'CREATE_FAILED' -->
+            <span class="glyphicon glyphicon-exclamation-sign text-danger center-block center"></span>
+            <!-- <div data-bind="text: Status" class="labelInvertFailure"></div> -->
+          <!-- /ko -->
+          <!-- ko ifnot: Status.indexOf('CREATE_') !== -1 -->
+            <span class="glyphicon glyphicon-exclamation-sign text-warning center-block center"></span>
+            <!-- <div data-bind="text: Status" class="labelInvertDelete"></div> -->
+          <!-- /ko -->
+        </td>
+        <td data-bind="text: Type"></td>
+        <td data-bind="text: LogicalID"></td>
+        <td data-bind="text: Reason"></td>
+      </tr>
+    </tbody>
+    <tfoot>
+      <tr>
+        <td colspan="5">
+          <button class="btn btn-default"
+                  type="button"
+                  data-bind="click: $parent.goToStackList">Back</button>
+        </td>
+      </tr>
+    </tfoot>
+  </table>
+</div>

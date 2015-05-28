@@ -1,0 +1,2 @@
+*/5 * * * * root /usr/share/stack-it/jobs/scheduler.pl -c /etc/stack-it/job.conf 2>&1 | logger -i -p local5.info -t stackit_job
+*/5 * * * * root /usr/share/stack-it/jobs/dns-updater.pl -c /etc/stack-it/job.conf 2>&1 | logger -i -p local5.info -t stackit_job

@@ -1,0 +1,93 @@
+[
+ {
+    "InstanceName"    : "CmdLineTestAUIDB0",
+    "ImageID"         : "centos_6",
+    "KeyName"         : "qa-admin",
+    "Role"            : "AUI_DB",
+    "Version"         : "v2_1_3",
+    "Environment"     : "QA",
+    "SubnetID"        : "",
+    "InstanceType"    : "m1.small",
+    "SecurityGroupID" : "",
+    "SkipPuppet"      : false,
+    "ScheduleID"      : "0"
+  },
+  {
+    "InstanceName"    : "CmdLineTestAUIWWW1",
+    "ImageID"         : "windows_2008",
+    "KeyName"         : "qa-admin",
+    "Role"            : "AUI_WWW",
+    "Version"         : "v2_1_3",
+    "Environment"     : "QA",
+    "SubnetID"        : "",
+    "InstanceType"    : "m1.small",
+    "SecurityGroupID" : "",
+    "SkipPuppet"      : false,
+    "ScheduleID"      : "0"
+  },
+  {
+    "InstanceName"    : "CmdLineTestCAALL2",
+    "ImageID"         : "centos_5",
+    "KeyName"         : "qa-admin",
+    "Role"            : "CA_ALL",
+    "Version"         : "v3_2_8",
+    "Environment"     : "QA",
+    "SubnetID"        : "",
+    "InstanceType"    : "m1.small",
+    "SecurityGroupID" : "",
+    "SkipPuppet"      : false,
+    "ScheduleID"      : "0"
+  },
+  {
+    "InstanceName"    : "CmdLineTestCCXALL3",
+    "ImageID"         : "windows_2008",
+    "KeyName"         : "qa-admin",
+    "Role"            : "CCX_ALL",
+    "Version"         : "v3_7_0",
+    "Environment"     : "QA",
+    "SubnetID"        : "",
+    "InstanceType"    : "m1.small",
+    "SecurityGroupID" : "",
+    "SkipPuppet"      : false,
+    "ScheduleID"      : "0"
+  },
+  {
+    "InstanceName"    : "CmdLineTestDIRECTDBQUEUERELAY4",
+    "ImageID"         : "centos_6",
+    "KeyName"         : "qa-admin",
+    "Role"            : "DIRECT_DB_QUEUE_RELAY",
+    "Version"         : "v2_5_0_2",
+    "Environment"     : "QA",
+    "SubnetID"        : "",
+    "InstanceType"    : "m1.small",
+    "SecurityGroupID" : "",
+    "SkipPuppet"      : false,
+    "ScheduleID"      : "0"
+  },
+  {
+    "InstanceName"    : "CmdLineTestDIRECTHISPWWWDNS5",
+    "ImageID"         : "windows_2008",
+    "KeyName"         : "qa-admin",
+    "Role"            : "DIRECT_HISP_WWW_DNS",
+    "Version"         : "v2_5_0_2",
+    "Environment"     : "QA",
+    "SubnetID"        : "",
+    "InstanceType"    : "m1.small",
+    "SecurityGroupID" : "",
+    "SkipPuppet"      : false,
+    "ScheduleID"      : "0"
+  },
+  {
+    "InstanceName"    : "CmdLineTestTESTCONDUCTOR6",
+    "ImageID"         : "windows_2008",
+    "KeyName"         : "qa-admin",
+    "Role"            : "TEST_CONDUCTOR",
+    "Version"         : "v1_0_0",
+    "Environment"     : "QA",
+    "SubnetID"        : "",
+    "InstanceType"    : "m1.small",
+    "SecurityGroupID" : "",
+    "SkipPuppet"      : false,
+    "ScheduleID"      : "0"
+  }
+]

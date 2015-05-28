@@ -1,0 +1,9 @@
+[% INCLUDE stack_create.tt %]
+[% INCLUDE stack_list.tt %]
+[% INCLUDE stack_events.tt %]
+[% INCLUDE instance_list.tt %]
+[% INCLUDE instance_data.tt %]
+
+<div id="Message" class="MessagesDiv" hidden>
+  <span class="MessagesSpan"></span>
+</div>

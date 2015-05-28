@@ -1,0 +1,12 @@
+defaults:
+  driver: mysql
+
+development:
+  host: localhost
+  username: db_user
+  database: stack_it
+
+snapshot:
+  host: localhost
+  username: db_user
+  database: snapshot

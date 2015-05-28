@@ -1,0 +1,65 @@
+[% IF no_wrapper %]
+  [% content %]
+[% ELSE %]
+<!DOCTYPE HTML>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>StackIt - AWS CloudFormation Generator</title>
+    <script type="text/javascript"
+            src="https://ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.min.js"></script>
+    [% INCLUDE bootstrap.tt | indent(4) %]
+    <link rel="stylesheet" type="text/css"
+            href="[% c.uri_for('/static/css/application.css') %]" />
+    <script type="text/javascript"
+            src="[% c.uri_for('/static/js/jquery.center.js') %]"></script>
+    <script type="text/javascript"
+            src="[% c.uri_for('/static/js/3rdParty/spin.js') %]"></script>
+    <script type="text/javascript"
+            src="[% c.uri_for('/static/js/3rdParty/knockout-2.3.0.js') %]"></script>
+    <script type="text/javascript"
+            src="[% c.uri_for('/static/js/name_generator.js') %]"></script>
+    <script type="text/javascript"
+            src="[% c.uri_for('/static/js/global.js') %]"></script>
+    <script type="text/javascript"
+            src="[% c.uri_for('/static/js/menu.js') %]"></script>
+    <script type="text/javascript"
+            src="[% c.uri_for('/static/js/application.js') %]"></script>
+    <script type="text/javascript"
+            src="[% c.uri_for('/static/js/model/instance.js') %]"></script>
+    <script type="text/javascript"
+            src="[% c.uri_for('/static/js/model/role_collection.js') %]"></script>
+    <script type="text/javascript"
+            src="[% c.uri_for('/static/js/view/instance.js') %]"></script>
+    <script type="text/javascript"
+            src="[% c.uri_for('/static/js/view/stack.js') %]"></script>
+    <script type="text/javascript"
+            src="[% c.uri_for('/static/js/view_model.js') %]"></script>
+  </head>
+  <body>
+
+    <div class="navbar navbar-default navbar-fixed-top">
+      <div class="container">
+        <div class="navbar-header">
+          <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-collapse">
+            <span class="sr-only">Toggle navigation</span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+          </button>
+          <a href="/" class="navbar-brand">Stack It</a>
+          <div class="VersionWrapper"><div class="Version">[% c.VERSION %]</div></div>
+        </div>
+        <div class="collapse navbar-collapse">
+          <nav id="menu" class="nav navbar-nav navbar-right"></nav>
+        </div>
+      </div>
+    </div>
+
+    <div class="container">
+      [% content %]
+    </div>
+
+  </body>
+</html>
+[% END %]

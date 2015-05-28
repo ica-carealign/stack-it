@@ -1,0 +1,252 @@
+#!/bin/bash
+
+SPACEWALK_HOST="192.168.1.2"
+SPACEWALK_URL="http://${SPACEWALK_HOST}"
+GPG_KEY_URL="${SPACEWALK_URL}/pub/keys"
+GPG_KEY_DIR="/etc/pki/rpm-gpg/"
+HOSTNAME=`hostname`
+
+cat <<EOF > /etc/profile.d/puppet_master.sh
+export FACTER_ICA_PUPPET_ROLE=PUPPET_MASTER
+EOF
+
+. /etc/profile.d/puppet_master.sh
+
+# Install GPG Keys
+cd ${GPG_KEY_DIR}
+
+for key in RPM-GPG-KEY-ICA.ICA RPM-GPG-KEY-puppetlabs
+do
+  wget -q --no-clobber ${GPG_KEY_URL}/$key
+  chmod 0644 $key
+  keyid=$(echo $(gpg --throw-keyids < $key) | cut --characters=11-18 | tr [A-Z] [a-z])
+
+  if ! rpm -q gpg-pubkey-$keyid > /dev/null 2>&1 ; then
+    echo "Installing GPG public key with ID $keyid from $key..."
+    rpm --import $key
+  else
+    echo "Key $key already imported into rpm database."
+  fi
+done
+
+if [ ! -f /etc/yum.repos.d/ica-puppet-rhel6 ]
+then
+
+cat <<EOF > /etc/yum.repos.d/ica-puppet-rhel6.repo
+[ica-puppet-rhel6]
+name=Configuration files for ICA Puppet Masters
+baseurl=https://${SPACEWALK_HOST}/yum/ica-puppet-rhel6
+sslverify=False
+EOF
+
+fi
+
+if [ ! -f /etc/yum.repos.d/puppet-rhel6 ]
+then
+
+cat <<EOF > /etc/yum.repos.d/puppet-rhel6.repo
+[puppet-rhel6]
+name=Puppet 6.x x86_64
+baseurl=http://yum.puppetlabs.com/el/6/products/x86_64
+
+[puppet-dependencies-rhel6]
+name=Puppet 6.x Dependencies x86_64
+baseurl=http://yum.puppetlabs.com/el/6/dependencies/x86_64
+EOF
+
+fi
+
+yum -y install puppet-server-3.4.3
+
+cat <<EOF >> /etc/puppet/puppet.conf
+
+    report = true
+
+[master]
+EOF
+
+service puppetmaster start
+service puppetmaster stop
+
+yum -y install ica-puppet
+
+if [ -f /usr/share/ica/puppet/bin/manifest.sh ]; then
+  bash /usr/share/ica/puppet/bin/manifest.sh
+fi
+
+rm /etc/hiera.yaml
+ln -s /etc/puppet/hiera.yaml /etc/hiera.yaml
+
+service puppetmaster start
+
+yum -y install puppetdb-1.6.3 puppetdb-terminus-1.6.3
+
+cat <<EOF > /etc/puppet/puppetdb.conf
+[main]
+server = ${HOSTNAME}.us-east-1.compute.internal
+port = 8081
+EOF
+
+cat <<EOF >> /etc/puppet/puppet.conf
+
+    storeconfigs = true
+    storeconfigs_backend = puppetdb
+    reports = store, http
+EOF
+
+cat <<EOF > /etc/puppet/routes.yaml
+---
+master:
+  facts:
+    terminus: puppetdb
+    cache: yaml
+EOF
+
+sed -i 's/# host = <host>/host = 0.0.0.0/' /etc/puppetdb/conf.d/jetty.ini
+
+service puppetdb start
+service puppetmaster restart
+
+iptables -D INPUT -j REJECT --reject-with icmp-host-prohibited
+iptables -A INPUT -m state --state NEW -m tcp -p tcp --dport 8080 -j ACCEPT
+iptables -A INPUT -m state --state NEW -m tcp -p tcp --dport 8081 -j ACCEPT
+iptables -A INPUT -j REJECT --reject-with icmp-host-prohibited
+
+service iptables save
+
+# Testing puppetdb
+# open browser to <host>:8080/dashboard/index.html
+
+yum -y install puppet-dashboard mysql-server expect
+
+sed -i 's/# deny everything else/path \/facts\nauth any\nmethod find, search\nallow *\n\n# deny everything else/' /etc/puppet/auth.conf
+
+# Testing the inventory service
+# curl -k -H "Accept: yaml" https://localhost:8140/production/facts/ip-172-31-16-71.us-east-1.compute.internal
+
+chkconfig mysqld on
+service mysqld start
+
+cat <<EOF > /root/configure_mysql
+#!/usr/bin/expect --
+spawn /usr/bin/mysql_secure_installation
+
+expect "Enter current password for root (enter for none):"
+send "\r"
+	
+expect "Set root password?"
+send "y\r"
+
+expect "New password:"
+send "password\r"
+
+expect "Re-enter new password:"
+send "password\r"
+
+expect "Remove anonymous users?"
+send "y\r"
+
+expect "Disallow root login remotely?"
+send "y\r"
+
+expect "Remove test database and access to it?"
+send "y\r"
+
+expect "Reload privilege tables now?"
+send "y\r"
+
+puts "Ended expect script."
+EOF
+
+chmod 700 /root/configure_mysql
+/root/configure_mysql
+
+echo "CREATE DATABASE dashboard CHARACTER SET utf8;" | mysql -uroot -ppassword
+echo "CREATE USER 'dashboard'@'localhost' IDENTIFIED BY 'dashboard123';" | mysql -uroot -ppassword
+echo "GRANT ALL PRIVILEGES ON dashboard.* TO 'dashboard'@'localhost';" | mysql -uroot -ppassword
+
+sed -i 's/database: dashboard_production/database: dashboard/' /usr/share/puppet-dashboard/config/database.yml
+sed -i 's/password:/password: dashboard123/' /usr/share/puppet-dashboard/config/database.yml
+
+sed -i "s/'puppet'/'${HOSTNAME}.us-east-1.compute.internal'/" /usr/share/puppet-dashboard/config/settings.yml
+sed -i 's/enable_inventory_service: false/enable_inventory_service: true/' /usr/share/puppet-dashboard/config/settings.yml
+
+sed -i 's/\[mysqld_safe\]/max_allowed_packet = 32M\n\n\[mysqld_safe\]/' /etc/my.cnf
+echo "set global max_allowed_packet = 33554432" | mysql -uroot -ppassword
+
+service mysqld restart
+
+cd /usr/share/puppet-dashboard/
+rake gems:refresh_specs
+rake RAILS_ENV=production db:migrate
+
+if [ ! -f /usr/share/puppet-dashboard/log/production.log ]
+then
+  touch /usr/share/puppet-dashboard/log/production.log
+fi
+
+chmod 0666 /usr/share/puppet-dashboard/log/production.log
+
+iptables -D INPUT -j REJECT --reject-with icmp-host-prohibited
+iptables -A INPUT -m state --state NEW -m tcp -p tcp --dport 3000 -j ACCEPT
+iptables -A INPUT -j REJECT --reject-with icmp-host-prohibited
+
+service iptables save
+
+chkconfig puppet-dashboard on
+chkconfig puppet-dashboard-workers on
+service puppet-dashboard start
+service puppet-dashboard-workers start
+
+yum -y install ruby-devel mysql-devel gcc patch
+gem install hiera-mysql-backend
+
+# diff -Naur mysql2_backend.rb mysql2_backend.patched.rb > mysql2_backend.rb.patch
+
+cat <<EOF > /root/mysql2_backend.rb.patch
+--- mysql2_backend.rb   2014-02-10 18:32:15.000000000 -0500
++++ mysql2_backend.patched.rb   2014-02-11 13:39:39.000000000 -0500
+@@ -25,6 +25,8 @@
+         Hiera.debug("looking up #{key} in MySQL2 Backend")
+         Hiera.debug("resolution type is #{resolution_type}")
+
++        formatted = {}
++
+         Backend.datasources(scope, order_override) do |source|
+           Hiera.debug("Looking for data source #{source}")
+           sqlfile = Backend.datafile(:mysql2, scope, source, "sql") || next
+@@ -56,8 +58,11 @@
+           new_answer = Backend.parse_answer(data[key], scope)
+           results = query(connection_hash, new_answer)
+
++          for idx in 0 ... results.size
++            formatted[idx] = results[idx]
++          end
+         end
+-        return results
++        return formatted
+       end
+
+
+EOF
+
+cd /usr/lib/ruby/gems/1.8/gems/hiera-mysql-backend-0.0.4/lib/hiera/backend
+patch < /root/mysql2_backend.rb.patch
+
+# We need to install stack-it so we can load the database used by hiera
+puppet apply --modulepath=/etc/puppet/modules -e "include ica::repo::epel-rhel6 include ica::repo::ica-puppet-rhel6 include ica::stackit"
+
+service puppetmaster restart
+
+puppet agent --test --server ${HOSTNAME}.us-east-1.compute.internal
+
+iptables -D INPUT -j REJECT --reject-with icmp-host-prohibited
+iptables -A INPUT -s 172.30.0.0/16 -m state --state NEW -m tcp -p tcp --dport 8140 -j ACCEPT
+iptables -A INPUT -m state --state NEW -m tcp -p tcp --dport 80 -j ACCEPT
+iptables -A INPUT -j REJECT --reject-with icmp-host-prohibited
+
+service iptables save
+service puppetmaster stop
+service httpd restart
+
+exit 0

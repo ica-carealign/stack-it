@@ -1,0 +1,68 @@
+#!/bin/bash
+#
+# create-migration: creates a migration file, appropriately named to be run by run-migrations.
+#
+
+editor=${VISUAL:-${EDITOR:-vi}}
+
+Usage() {
+  echo "Usage: $0 [OPTIONS] title of migration"
+  echo "Options:"
+  echo "   -h : show this help message"
+  echo "   -e : open the migration file in $editor (influence with \$VISUAL)"
+}
+
+title=""
+open_in_editor=""
+
+while getopts he optarg; do
+  case $optarg in
+    h) Usage; exit;;
+    e) open_in_editor=1;;
+    *) Usage >&2; exit;;
+  esac
+done
+shift $(( ${OPTIND} - 1 ))
+
+title="$*"
+
+if [[ -z "$title" ]]; then
+  Usage >&2
+  exit 1
+fi
+
+migration_dir=$(dirname "$0")/../data/migrations
+migration_dir=$(cd "$migration_dir"; pwd)
+
+timestamp=$(TZ=UTC date +'%Y%m%d%H%M%S')
+
+safe_title=$(echo "$title" | tr A-Z a-z | sed '
+  s/[^[:alnum:]]/-/g;
+  s/-\{1,\}/-/g;
+  s/^-//;
+  s/-$//;
+')
+
+migration_name=$(echo "$timestamp-$safe_title" | cut -c1-51 | sed 's/-*$//').sql
+migration_full="$migration_dir/$migration_name"
+
+green=$(tput setaf 2)
+norm=$(tput sgr0)
+
+# Create the file only if it does not exist
+set -o noclobber
+if cat > "$migration_full"<<EOF; then
+--
+-- $migration_name
+--
+
+
+EOF
+  echo -e "\n${green}CREATED${norm}\n    $migration_full\n" | perl -lpe 's{$ENV{HOME}}{~}'
+  if [[ -n "$open_in_editor" ]]; then
+    "$editor" "$migration_full"
+  fi
+else
+  echo "Could not create '$migration_full'"
+fi
+

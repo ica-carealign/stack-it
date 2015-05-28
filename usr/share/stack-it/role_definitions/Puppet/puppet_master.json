@@ -1,0 +1,44 @@
+{
+  "role"         : "PUPPET_MASTER",
+  "description"  : "Puppet Master",
+  "environment"  : "Puppet",
+  "version"      : "NA",
+  "os"           : "centos_6_base_image",
+  "instances"    : 1,
+  "ports"        : [
+    {
+      "provides"    : "puppet-db",
+      "port"        : 3000,
+      "tcp"         : true,
+      "udp"         : false,
+      "external"    : false,
+      "inbound"     : true,
+      "outbound"    : false,
+      "clusterable" : false,
+      "use"         : "Puppet DB"
+    },
+    {
+      "provides"    : "stack-it",
+      "port"        : 80,
+      "tcp"         : true,
+      "udp"         : false,
+      "external"    : false,
+      "inbound"     : true,
+      "outbound"    : false,
+      "clusterable" : false,
+      "use"         : "Stack-It"
+    },
+    {
+      "provides"    : "puppet-master",
+      "port"        : 8140,
+      "tcp"         : true,
+      "udp"         : false,
+      "external"    : false,
+      "inbound"     : true,
+      "outbound"    : false,
+      "clusterable" : false,
+      "use"         : "Puppet Server"
+    }
+  ],
+  "dependencies" : []
+}

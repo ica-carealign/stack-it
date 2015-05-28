@@ -1,0 +1,58 @@
+#!/usr/bin/env perl
+use strict;
+use warnings;
+use FindBin qw($Script);
+use Getopt::Long qw(GetOptions);
+use StackIt::Env;
+use StackIt::DB::Config;
+
+sub usage {
+  my $usage = qq{
+    Usage: $Script [OPTIONS]
+
+    Tests whether the database for the current environment is configured.
+    If the connection is successful, returns 0, otherwise nonzero.
+
+    Options:
+       -h | --help            : show this help message
+       -v | --verbose         : verbose mode (succeed loudly)
+       -q | --quiet           : quiet mode (fail quietly)
+       -e | --environment env : specify StackIt environment name
+  };
+  for ($usage) { s/^\s+//s; s/\s+$//s; s/^    //mg; }
+  print STDERR "$usage\n";
+  exit(@_ ? shift : 1);
+}
+
+our ($Verbose,$Environment,$Quiet);
+Getopt::Long::Configure("bundling");
+GetOptions(
+  'help|h'          => sub { usage(0) },
+  'verbose|v'       => \$Verbose,
+  'environment|e=s' => \$Environment,
+  'quiet|q'         => \$Quiet,
+) || usage();
+
+my $env = $Environment || StackIt::Env->Environment;
+my $config = StackIt::DB::Config->new;
+my $details = $config->connectionDetails($env);
+
+eval {
+  my $dbh = $config->connect($env);
+  local $dbh->{RaiseError} = 1;
+  my ($db) = @{ $dbh->selectcol_arrayref("SELECT DATABASE()") };
+  if (! $db) {
+    die "not connected to a specific database\n";
+  }
+  my ($count) = @{ $dbh->selectcol_arrayref("SELECT COUNT(1) FROM _migration") };
+  if ($count == 0) {
+    die "$details->{database} has not been migrated\n";
+  }
+  print "OK, connected to $details->{database}\n" if $Verbose;
+  exit 0;
+};
+
+my $err = $@ || 'unknown error';
+$err =~ s/\n*$/\n/;
+print "NOT OK: $err" unless $Quiet;
+exit 1;

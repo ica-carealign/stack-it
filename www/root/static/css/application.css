@@ -1,0 +1,191 @@
+@font-face {
+  font-family: "Myriad Pro Semibold";
+  src: url(/static/fonts/MyriadPro-Semibold.otf) format('opentype');
+}
+
+.navbar-brand {
+  text-indent: -119988px;
+  overflow: hidden;
+  text-align: left;
+  background-image: url(/static/images/stackit_logo.svg);
+  background-repeat: no-repeat;
+  background-position: 0px 10px;
+  background-size: Auto 50px;
+  width: 112px;
+}
+
+body {
+  padding-top: 60px;
+}
+
+h1 {
+  font-family: "Myriad Pro Semibold";
+}
+
+.page-header .btn {
+  float: right;
+}
+
+.center {
+  text-align: center;
+}
+
+.border {
+  border: 1px solid red;
+}
+
+/* For stack_list.tt */
+table.stackList tbody tr {
+  cursor: pointer;
+}
+
+.imgButton {
+  height: 24px;
+  width: 24px;
+}
+
+.labelSuccess,
+.labelFailure,
+.labelInProgress,
+.labelDelete{
+  color: #FFFFFF;
+  text-align: center;
+  width: 80%;
+  -moz-border-radius: 4px;
+  -webkit-border-radius: 4px;
+  -khtml-border-radius: 4px;
+  border-radius: 4px;
+}
+
+.labelDelete {
+  background-color: #d9534f;
+}
+
+.labelSuccess {
+  background-color: #5cb85c;
+}
+
+.labelFailure {
+  background-color: #f0ad4e;
+}
+
+.labelInProgress {
+  background-color: #5bc0de;
+}
+
+/* For stack_list.tt and stack_create.tt */
+table#stackList td,
+table#stackCreate td {
+  vertical-align: middle;
+}
+
+td.actions {
+  text-align: right;
+  width: 10%;
+}
+
+/* For stack_events.tt */
+table#stackEvents td {
+  vertical-align: middle;
+}
+
+.labelInvertSuccess {
+  color: #5cb85c;
+  font-weight: bold;
+}
+
+.labelInvertInProgress {
+  color: #5bc0de;
+  font-weight: bold;
+}
+
+.labelInvertFailure {
+  color: #f0ad4e;
+  font-weight: bold;
+}
+
+.labelInvertDelete {
+  color: #d9534f;
+  font-weight: bold;
+}
+
+.click-glyph {
+  width: 40px;
+}
+
+/* For stack_create.tt */
+th.os, td.os,
+th.role, td.role,
+th.version, td.version,
+th.environment, td.environment {
+  width: 20%;
+}
+
+.stackEnvironment {
+  float: right;
+}
+
+.instanceOptionsWrapper {
+  margin: 0 auto;
+  width: 500px;
+}
+
+.instanceSelectCtl, .instanceTextCtl {
+  width: 232px;
+}
+
+.MessagesDiv {
+  position: fixed;
+  bottom: 05%;
+  left: 25%;
+  width: 50%;
+  text-align: center;
+  -moz-border-radius: 4px;
+  -webkit-border-radius: 4px;
+  -khtml-border-radius: 4px;
+  border-radius: 4px;
+  height: 48px;
+  z-index: 10000;
+  line-height: 48px;
+  font-weight: bold;
+}
+
+.MessagesSpan {
+  display: inline-block;
+  vertical-align: middle;
+  line-height: normal;      
+}
+
+.MessageError {
+  color: #FFFFFF;
+  background-color: #E00000;
+}
+
+.MessageWarning {
+  color: #000000;
+  background-color: #f0ad4e;
+}
+
+.MessageSuccess {
+  color: #FFFFFF;
+  background-color: #5CB85C;
+}
+
+.icon {
+  height: 18px;
+  width: 18px;
+}
+
+.VersionWrapper {
+  display: table;
+  height: 50px;
+  float: right;
+}
+
+.Version {
+  display: table-cell;
+  vertical-align: bottom;
+  font-weight: bold;
+}
+
+/* vim: set ts=2 sw=2 et : */

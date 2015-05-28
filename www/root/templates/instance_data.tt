@@ -1,0 +1,122 @@
+<div data-bind="with: instanceData">
+  <h1 data-bind="text: $parent.instanceDataTitle"></h1>
+  <table id="instanceData" class="table">
+    <thead>
+      <tr>
+        <th>Key</th>
+        <th>Value</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Instance ID:</td>
+        <td data-bind="text: InstanceID"></td>
+      </tr>
+      <tr>
+        <td>Instance Name:</td>
+        <td data-bind="text: InstanceName"></td>
+      </tr>
+      <tr>
+        <td>Launch Time:</td>
+        <td data-bind="text: LaunchTime"></td>
+      </tr>
+      <tr>
+        <td>Instance Type:</td>
+        <td data-bind="text: InstanceType"></td>
+      </tr>
+      <tr>
+        <td>State:</td>
+        <td data-bind="text: State"></td>
+      </tr>
+      <tr>
+        <td>Zone:</td>
+        <td data-bind="text: Zone"></td>
+      </tr>
+      <tr>
+        <td>Key Name:</td>
+        <td data-bind="text: KeyName"></td>
+      </tr>
+      <tr>
+        <td>Tenancy:</td>
+        <td data-bind="text: Tenancy"></td>
+      </tr>
+      <tr>
+        <td>Monitoring State:</td>
+        <td data-bind="text: MonitoringState"></td>
+      </tr>
+      <tr>
+        <td>Hypervisor:</td>
+        <td data-bind="text: Hypervisor"></td>
+      </tr>
+      <tr>
+        <td>Virtualization Type:</td>
+        <td data-bind="text: VirtualizationType"></td>
+      </tr>
+      <tr>
+        <td>Image ID:</td>
+        <td data-bind="text: ImageID"></td>
+      </tr>
+      <tr>
+        <td>Image Name:</td>
+        <td data-bind="text: ImageName"></td>
+      </tr>
+      <tr>
+        <td>KernelID:</td>
+        <td data-bind="text: KernelID"></td>
+      </tr>
+      <tr>
+        <td>Storage Type:</td>
+        <td data-bind="text: StorageType"></td>
+      </tr>
+      <tr>
+        <td>EBS Optimized:</td>
+        <td data-bind="text: EBSOptimized"></td>
+      </tr>
+      <tr>
+        <td>VPC ID:</td>
+        <td data-bind="text: VPCID"></td>
+      </tr>
+      <tr>
+        <td>Subnet ID:</td>
+        <td data-bind="text: SubnetID"></td>
+      </tr>
+      <tr>
+        <td>Hostname:</td>
+        <td data-bind="text: HostName"></td>
+      </tr>
+      <tr>
+        <td>Private DNS:</td>
+        <td data-bind="text: PrivateDNS"></td>
+      </tr>
+      <tr>
+        <td>Private IP:</td>
+        <td data-bind="text: PrivateIP"></td>
+      </tr>
+      <tr>
+        <td>Public DNS:</td>
+        <td data-bind="text: PublicDNS"></td>
+      </tr>
+      <tr>
+        <td>Public IP:</td>
+        <td data-bind="text: PublicIP"></td>
+      </tr>
+      <tr>
+        <td>Security Group ID:</td>
+        <td data-bind="text: SecurityGroupID"></td>
+      </tr>
+      <tr>
+        <td>Cluster Group:</td>
+        <td data-bind="text: ClusterGroup"></td>
+      </tr>
+    </tbody>
+    <tfoot>
+      <tr>
+        <td colspan="5">
+          <button class="btn btn-default"
+                  type="button"
+                  data-bind="click: $parent.goToStackInstanceList">Back</button>
+        </td>
+      </tr>
+    </tfoot>
+  </table>
+</div>

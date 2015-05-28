@@ -1,0 +1,103 @@
+<div data-bind="with: stackInstanceList">
+  <h1 data-bind="text: $parent.stackInstanceListTitle"></h1>
+  <table id="stackInstanceList" class="stackList table table-hover">
+    <thead>
+      <tr>
+        <th class="center">Status</th>
+        <th></th>
+        <th>Name</th>
+        <th>Image</th>
+        <th>Type</th>
+        <th>Private IP</th>
+        <th>Public IP</th>
+        <th>
+          <!-- ko if: json.PowerState == 'running' -->
+          <button type="button" class="btn btn-success" title="Click to Power Down Stack" data-bind="click: $root.stopStack">
+            <span class="glyphicon glyphicon-off"></span>
+          </button>
+          <!-- /ko -->
+          <!-- ko if: json.PowerState == 'stopped' -->
+          <button type="button" class="btn btn-danger" title="Click to Power Up Stack" data-bind="click: $root.startStack">
+            <span class="glyphicon glyphicon-off"></span>
+          </button>
+          <!-- /ko -->
+          <!-- ko if: json.PowerState == 'mixed' -->
+          <div class="btn-group btn-input clearfix">
+            <button type="button" class="btn btn-default dropdown-toggle form-control" data-toggle="dropdown">
+              <span class="glyphicon glyphicon-off"></span> <span class="caret"></span>
+            </button>
+            <ul class="dropdown-menu" role="menu">
+              <li>
+                <button type="button" class="btn btn-success" title="Click to Power Down Stack" data-bind="click: $root.stopStack">
+                  <span class="glyphicon glyphicon-off"></span>
+                </button> Power Down
+              </li>
+              <li>
+                <button type="button" class="btn btn-danger" title="Click to Power Up Stack" data-bind="click: $root.startStack">
+                  <span class="glyphicon glyphicon-off"></span>
+                </button> Power Up
+              </li>
+            </ul>
+          </div>
+          <!-- /ko -->
+        </th>
+      </tr>
+    </thead>
+    <tbody data-bind="foreach: json.Collection">
+      <tr>
+        <td data-bind="click: $root.goToPuppetDB">
+        <!-- ko if: BuildStatus == 1 -->
+          <span class="glyphicon glyphicon-ok-sign text-success center-block center"></span>
+        <!-- /ko -->
+        <!-- ko if: BuildStatus == 0 -->
+          <span class="glyphicon glyphicon-question-sign text-primary center-block center"></span>
+        <!-- /ko -->
+        <!-- ko if: BuildStatus > 1 -->
+          <span class="glyphicon glyphicon-exclamation-sign text-danger center-block center"></span>
+        <!-- /ko -->
+        </td>
+        <td>
+          <!-- ko if: State == 'running' -->
+          <span data-bind="if: Platform=='windows'">
+            <img src="/static/images/rdp.svg" style="height:34px" data-bind="attr: { title: 'Remote Desktop to ' + InstanceName }, click: $root.OpenRemoteConnection" />
+          </span>
+          <span data-bind="if: Platform!='windows'">
+            <img src="/static/images/ssh.svg" style="height:34px" data-bind="attr: { title: 'SSH to ' + InstanceName }, click: $root.OpenRemoteConnection" />
+          </span>
+          <!-- /ko -->
+        </td>
+        <td data-bind="text: InstanceName, click: $root.goToInstanceData"></td>
+        <td data-bind="text: ImageName, click: $root.goToInstanceData"></td>
+        <td data-bind="text: InstanceType, click: $root.goToInstanceData"></td>
+        <td data-bind="text: PrivateIP"></td>
+        <td data-bind="text: PublicIP"></td>
+        <td>
+          <!-- ko if: State == 'running' -->
+          <button type="button" class="btn btn-success" title="Click to Power Down" data-bind="click: $root.stopInstance">
+            <span class="glyphicon glyphicon-off"></span>
+          </button>
+          <!-- /ko -->
+          <!-- ko if: State == 'stopped' -->
+          <button type="button" class="btn btn-danger" title="Click to Power Up" data-bind="click: $root.startInstance">
+            <span class="glyphicon glyphicon-off"></span>
+          </button>
+          <!-- /ko -->
+          <!-- ko if: State == 'pending' || State == 'shutting-down' || State == 'stopping' -->
+          <button type="button" class="btn btn-warning disabled" title="Transitioning...">
+            <span class="glyphicon glyphicon-off"></span>
+          </button>
+          <!-- /ko -->
+        </td>
+      </tr>
+    </tbody>
+    <tfoot>
+      <tr>
+        <td colspan="8">
+          <button class="btn btn-default"
+                  type="button"
+                  data-bind="click: $parent.goToStackList">Back</button>
+        </td>
+      </tr>
+    </tfoot>
+  </table>
+</div>

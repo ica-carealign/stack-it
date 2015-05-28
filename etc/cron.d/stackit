@@ -1,0 +1,1 @@
+* * * * * root /usr/share/stack-it/jobs/scaffold.pl 2>&1 | logger -i -p local5.info -t stackit_job

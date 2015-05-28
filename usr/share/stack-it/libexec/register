@@ -1,0 +1,601 @@
+#!/bin/bash
+
+### Begin Global Variables #####################################################
+
+RHN_DIR="/etc/sysconfig/rhn"
+UP2DATE_CONF="${RHN_DIR}/up2date"
+ID_FILE="${RHN_DIR}/systemid"
+YUM_CONF_DIR="/etc/yum.repos.d"
+SPACEWALK_HOST="172.31.40.184"
+SPACEWALK_URL="http://${SPACEWALK_HOST}"
+GPG_KEY_URL="${SPACEWALK_URL}/pub/keys"
+GPG_KEY_DIR="/etc/pki/rpm-gpg/"
+INSTANCE_HOSTNAME=""
+RPM_DIR="${SPACEWALK_URL}/pub/rpms"
+RELEASE_FILE="/etc/redhat-release"
+PUPPET_INIT="/etc/init.d/puppet"
+PUPPET_CONF="/etc/puppet/puppet.conf"
+PUPPETMASTER_HOST="ip-172-31-40-184.us-east-1.compute.internal"
+PUPPET_ENV="/etc/profile.d/puppet_agent.sh"
+
+### End Global Variables #######################################################
+
+################################################################################
+### Do not change anything past this line ######################################
+################################################################################
+
+### Begin Functions ############################################################
+
+CheckForUpdates() {
+  if [[ ${TEST} -eq 1 ]]; then
+    UPDATE=0
+  fi
+
+  # Stop Yum Updates daemon as it causes yum to fail if it has a lot on the
+  # rpm database.
+  if [ -f "/etc/init.d/yum-updatesd" ]; then
+    /etc/init.d/yum-updatesd stop
+  else
+    echo "Yum updatesd is not installed - will not attempt to stop."
+  fi
+
+  echo
+
+  if [[ ${UPDATE} -eq 1 ]]; then
+    yum -y update
+  else
+    # Check for updates.
+    countupdates=`yum -q check-update | wc -l`
+
+    if [ $countupdates -eq 0 ]; then
+      echo "Congratulations - This system appears to be up to date."
+    else
+      Echo "###################################################" "green"
+      Echo "      There are $countupdates updated packages     " "yellow" "bold"
+      Echo "      available to the system.                     " "yellow" "bold"
+      Echo "###################################################" "green"
+    fi
+  fi
+
+  echo
+
+  # Restarting yum-updated
+  if [ -f "/etc/init.d/yum-updatesd" ]; then
+    /etc/init.d/yum-updatesd start
+  else
+    echo "Yum updatesd is not installed - will not attempt to start."
+  fi
+}
+
+CleanRepoFiles() {
+  # Prepare the configuration directory
+  if [ -d "${YUM_CONF_DIR}/outdated" ]; then
+    echo "Outdated repo config directory already exists."
+  else
+    mkdir ${YUM_CONF_DIR}/outdated
+  fi
+
+  mv ${YUM_CONF_DIR}/*.repo ${YUM_CONF_DIR}/outdated 2>/dev/null
+}
+
+Echo() {
+  local msg=$1
+  local color=$2
+  local effect=$3
+
+  local ansi_color=''
+  local ansi_effect=''
+  local ansi_reset='\033[0m'
+  local ansi_bold=''
+  local ansi_underline=''
+
+  if [ "${color}" = "red" ]; then
+    ansi_color='\033[31m';
+  elif [ "${color}" = "green" ]; then
+    ansi_color='\033[32m';
+  elif [ "${color}" = "yellow" ]; then
+    ansi_color='\033[33m';
+  elif [ "${color}" = "blue" ]; then
+    ansi_color='\033[34m';
+  elif [ "${color}" = "magenta" ]; then
+    ansi_color='\033[35m';
+  elif [ "${color}" = "cyan" ]; then
+    ansi_color='\033[36m';
+  fi
+
+  if [ "${effect}" = "blink" ]; then
+    ansi_effect='\033[5m'
+  elif [ "${effect}" = "bold" ]; then
+    ansi_effect='\033[1m';
+  elif [ "${effect}" = "underline" ]; then
+    ansi_effect='\033[4m';
+  fi
+
+  echo -e "${ansi_color}${ansi_effect}${msg}${ansi_reset}"
+}
+
+GetDistroRelease() {
+  local string=$1
+
+  if [[ "${string}" =~ ^CentOS ]]; then
+    DISTRO="CentOS"
+    CURRENT_DISTRO="CentOS"
+  elif [[ "${string}" =~ ^Red ]]; then
+    DISTRO="RHEL"
+    CURRENT_DISTRO="RHEL"
+  fi
+
+  RELEASE_VERSION=`echo "${string}" | sed 's/^.*release \([.0-9]*\) .*/\1/'`
+  CURRENT_RELEASE_VERSION=${RELEASE_VERSION}
+}
+
+GetRepoFile() {
+  local repo_file="ica-spacewalk-6x.repo"
+
+  yum clean all
+  cd ${YUM_CONF_DIR}
+
+  if [[ "${RELEASE_VERSION}" < "6.0" ]]; then
+    repo_file="ica-spacewalk-5x.repo"
+  fi
+
+  # Get the ICA Repofile to be able to install spacewalk
+  if [ -f "${YUM_CONF_DIR}/${repo_file}" ]; then
+    echo "Previously downloaded ${repo_file} found... Removing."
+    rm -f ${YUM_CONF_DIR}/${repo_file}
+  else
+    echo "Transferring ${repo_file} file from spacewalk server."
+  fi
+
+  wget ${SPACEWALK_URL}/pub/scripts/${repo_file}
+
+  # Make sure we have a valid repo file
+  if [ ! -f "${YUM_CONF_DIR}/${repo_file}" ]; then
+    echo "Could not wget ${SPACEWALK_URL}/pub/scripts/${repo_file}...exiting"
+    exit 1
+  fi
+}
+
+GetSystemID() {
+  if [ -f ${ID_FILE} ]; then
+    SYSTEM_ID=`cat ${ID_FILE} | grep -o 'ID-[[:digit:]]\{10\}' | sed 's/ID-//'`
+  else
+    Echo "ERROR:  ${ID_FILE} does not exist.  Cannot get system id...Exiting" "red"
+    exit 255
+  fi
+}
+
+ImportKeys() {
+  local keycount=0
+
+  # Install GPG Keys
+  cd ${GPG_KEY_DIR}
+
+  for key in RPM-GPG-KEY-ICA.ICA RPM-GPG-KEY-puppetlabs RPM-GPG-KEY-foreman
+  do
+    wget -q --no-clobber ${GPG_KEY_URL}/$key
+    chmod 0644 $key
+    keyid=$(echo $(gpg --throw-keyids < $key) | cut --characters=11-18 | tr [A-Z] [a-z])
+
+    if ! rpm -q gpg-pubkey-$keyid > /dev/null 2>&1 ; then
+      echo "Installing GPG public key with ID $keyid from $key..."
+      rpm --import $key
+      let keycount++
+    else
+      echo "Key $key already imported into rpm database."
+    fi
+  done
+
+  InstallUpdateRpms ica-rpm-keys
+
+  sleep 2
+}
+
+InstallPackage() {
+  local package=$1
+  local binary=$2
+  local arch=$3
+
+  if [ -f ${binary} ]; then
+    echo "${binary} found.  Continuing."
+  else
+    echo "Attempting to install ${package} via yum."
+    yum -q -y install ${package}.${arch}
+
+    if [ -f ${binary} ]; then
+      echo "${package} is now properly installed.  Continuing."
+    else
+      echo "${package} was not found at ${binary} and attempted yum install failed.  Exiting."
+      exit 255
+    fi
+  fi
+}
+
+InstallUpdateRpms() {
+  local list=( "$@" )
+  local update_rpms=""
+  local install_rpms=""
+
+  # Install/update required packages
+  for rpm in "${list[@]}"
+  do
+    if [ `rpm -q ${rpm} | grep -v "package ${rpm} is not installed"` ];
+    then
+      # Package is already installed
+      update_rpms="${update_rpms} ${rpm}"
+    else
+      install_rpms="${install_rpms} ${rpm}"
+    fi
+  done
+
+  if [ "${update_rpms}" != "" ]; then
+    yum -y update ${update_rpms}
+  fi
+
+  if [ "${install_rpms}" != "" ]; then
+    yum -y install ${install_rpms}
+  fi
+}
+
+PrepareForPuppet() {
+  # Their needs to be checks to make sure we have the correct version of puppet here
+  yum -y install puppet-3.4.3
+
+  if [[ ${SKIP_PUPPET} -eq 0 ]]; then
+    Echo "Running PrepareForPuppet - modifying puppet configuration files" "green"
+
+    if [ -f ${PUPPET_INIT} ] && [ -f ${PUPPET_CONF} ]; then
+      # Modify the init script to include env variables
+      # from /etc/profile.d/puppet_agent.sh
+      sed -i '1!N; s/export PATH/export PATH\n\nif [ -f \/etc\/profile.d\/puppet_agent.sh ]\nthen\n  . \/etc\/profile.d\/puppet_agent.sh\nfi/' ${PUPPET_INIT}
+
+      # Update puppet.conf to include hostname of the puppet master
+      sed -i "s/\[agent\]/    server=${PUPPETMASTER_HOST}\n\[agent\]/" ${PUPPET_CONF}
+    else
+      Echo "Cannot find ${PUPPET_INIT} and/or ${PUPPET_CONF}!" "red"
+      Echo "Skipping puppet registration" "red"
+      SKIP_PUPPET=1
+    fi
+  else
+    Echo "Skipping Puppet preparation" "green"
+  fi
+}
+
+PrepareForSpacewalk() {
+  local packages=""
+
+  # Install/update required packages
+  packages+="yum-utils yum-rhn-plugin rhnsd yum-updatesd rhncfg-actions "
+  packages+="rhncfg rhncfg-management spacecmd python-simplejson"
+
+  # Is already registered
+  if [[ ${IS_REGISTERED} -gt 0 ]]; then
+    # Update required packages
+    yum -y update ${packages}
+  else
+    if [[ ${HAS_REGISTERED} -gt 0 ]]; then
+      # Running yum commands under this condition will cause errors until we
+      # re-register.
+      echo "This server has previously been registered with Spacewalk.  Continuing"
+    else
+      InstallUpdateRpms ${packages}
+
+      if [ `rpm -q dovecot | grep -v "package dovecot is not installed"` ]; then
+        yum -y remove dovecot
+      fi
+    fi
+  fi
+
+  # Removing yum cache directory as yum clean all will not 
+  # remove caches that it no longer knows about.
+  rm -rf /var/cache/yum
+}
+
+RegisterWithPuppet() {
+  if [[ ${SKIP_PUPPET} -eq 0 ]]; then
+    Echo "Running RegisterWithPuppet - starting required services and registering with puppet master" "green"
+
+    if [ -f ${PUPPET_ENV} ]; then
+      . ${PUPPET_ENV}
+    fi
+
+    puppet agent --server ${PUPPETMASTER_HOST} --waitforcert 60 --test
+    chkconfig puppet on
+    service puppet start
+
+    echo
+    Echo "Puppet registration complete. The server should now be attached to the puppet master." "green"
+  else
+    Echo "Skipping Puppet registration" "green"
+  fi
+}
+
+RegisterWithSpacewalk() {
+  # Starting (restarting) required services for rhnreg_ks
+  /etc/init.d/messagebus restart
+  /etc/init.d/haldaemon restart
+  echo
+
+  MoveSystemID
+
+  if [[ ${RE_REGISTER} -eq 1 ]]; then
+    # Re-registration
+    /usr/sbin/rhnreg_ks --serverUrl=${SPACEWALK_URL}/XMLRPC --activationkey=${SW_ACTIVATE_KEY} --force
+  else
+    # New Registration
+    /usr/sbin/rhnreg_ks --serverUrl=${SPACEWALK_URL}/XMLRPC --activationkey=${SW_ACTIVATE_KEY}
+  fi
+
+  /usr/bin/rhn-actions-control --enable-all
+}
+
+MoveSystemID() {
+  if [ -f "${RHN_DIR}/systemid" ]; then
+    echo "Renaming systemid to systemid.spacewalk."
+    mv ${RHN_DIR}/systemid ${RHN_DIR}/systemid.spacewalk
+  else
+    echo "No systemid file exists. Continuing."
+  fi
+}
+
+SetActivationKey() {
+  local distro=$1
+  local release=$2
+
+  case ${distro} in
+    CentOS)
+            if [[ ${release} > 5 ]] && [[ ${release} < 6 ]]; then
+              SW_ACTIVATE_KEY="1-generic-centos-5x";
+            elif [[ ${release} > 6 ]] && [[ ${release} < 7 ]]; then
+              SW_ACTIVATE_KEY="1-generic-centos-6x";
+            else
+              echo "Unsupported CentOS Version";
+              exit 255;
+            fi
+            ;;
+    RHEL)
+            if [[ ${release} > 5 ]] && [[ ${release} < 6 ]]; then
+              SW_ACTIVATE_KEY="1-generic-centos-5x";
+            elif [[ ${release} > 6 ]] && [[ ${release} < 7 ]]; then
+              SW_ACTIVATE_KEY="1-generic-centos-6x";
+            else
+              echo "Unsupported RHEL Version";
+              exit 255;
+            fi
+            ;;
+    *) echo "Unknown Distro"; exit 255;
+  esac
+}
+
+SetPuppetEnvironment() {
+  local setting=$1
+  echo "export ${setting}" >> ${PUPPET_ENV}
+}
+
+UpdateHosts() {
+  echo >> /etc/hosts
+  echo "${SPACEWALK_HOST} spacewalk" >> /etc/hosts
+}
+
+SetInstanceHostName() {
+  orig_host=`/bin/hostname --long`
+
+  ipaddr=`/sbin/ip -4 -o addr show dev eth0 |
+     /usr/bin/perl -lne 'print $1 if m{inet ([^/]+)}' |
+     /usr/bin/head -1`
+
+  if [[ -z "$ipaddr" ]]; then
+      Echo " Can't determine local IPv4 address.               " "red" "bold"
+      Echo " Hostname will remain '$orig_host'                 " "red" "bold"
+      echo
+
+  elif [[ -n "$INSTANCE_HOSTNAME" && "$INSTANCE_HOSTNAME" != "$orig_host" ]]; then
+      Echo " Setting hostname to $INSTANCE_HOSTNAME            " "green" "bold"
+      echo
+
+      instance_short=`echo "$INSTANCE_HOSTNAME" | sed 's/\..*//'`
+      if [[ "$instance_short" == "$INSTANCE_HOSTNAME" ]]; then
+          # avoid "1.2.3.4 hostname.domainname hostname.domainname" in /etc/hosts
+          instance_short=''
+      fi
+
+      # Update /etc/hosts
+      echo "$ipaddr $INSTANCE_HOSTNAME $instance_short" >> /etc/hosts
+
+      # Update /etc/sysconfig/network
+      echo "NETWORKING=yes" > /etc/sysconfig/network
+      echo "HOSTNAME=$INSTANCE_HOSTNAME" >> /etc/sysconfig/network
+
+      # Update /etc/hostname
+      echo "$INSTANCE_HOSTNAME" > /etc/hostname
+      /bin/hostname "$INSTANCE_HOSTNAME"
+
+      # Restart networking to make changes effective.
+      /sbin/service network restart
+
+  else
+      Echo " Leaving hostname '$orig_host' intact.             " "green" "bold"
+
+  fi
+}
+
+Usage() {
+  local message=$1
+  local code=$2
+
+  if [ "${message}" != "" ]; then
+    echo "${message}"
+  fi
+
+  echo
+  echo "$0 [-e <variable=value> ...] [-m <puppet master>] [-r] [-s] [-t] [-u] [-h]"
+  echo
+  echo "  -h Print this help message"
+  echo "  -e Set Puppet environment variable"
+  echo "  -i Set instance hostname (fqdn)"
+  echo "  -m Puppet master"
+  echo "  -r Force re-registration with Spacewalk"
+  echo "  -s Skip Puppet registration"
+  echo "  -t Test mode"
+  echo "  -u Install all available updates after registration"
+  echo
+
+  exit ${code}
+}
+
+### End Functions ##############################################################
+
+if [ ! -f "/etc/redhat-release" ]; then
+  echo "This does not appear to be a valid Redhat / Centos installation. The file /etc/redhat-release was not found."
+  echo "This script should only be run on Redhat / Centos servers."
+  exit 1
+fi
+
+if [[ $EUID -ne 0 ]]; then
+  echo "This script must be run as root"
+  exit 1
+fi
+
+ARCH=`uname -m`
+HAS_REGISTERED=0
+RELEASE=`cat ${RELEASE_FILE}`
+RE_REGISTER=0
+TEST=0
+UPDATE=0
+SKIP_PUPPET=0
+
+# Set default DISTRO and RELEASE_VERSION
+GetDistroRelease "${RELEASE}"
+
+if [ -f ${UP2DATE_CONF} ]; then
+  HAS_REGISTERED=`cat ${UP2DATE_CONF} | grep ${SPACEWALK_URL} | wc -l`
+fi
+
+if [ "$ARCH" = "i686" ]; then
+  echo "###################################################"
+  echo
+  echo "  Script is being run on an unsupported platform.  "
+  echo "  uname -m shows this server as $ARCH. x86_64      "
+  echo "  is the only supported architecture.              "
+  echo
+  echo "###################################################"
+  exit 255
+elif [ "$ARCH" = "x86_64" ]; then
+  echo "uname -m reports this server as x86_64. Continuing."
+else
+  echo "Unknown platform. uname -m should report x86_64 to use this script."
+fi
+
+# Clean out /etc/yum.repos.d as this may break functionality
+if [[ ${HAS_REGISTERED} -gt 0 ]]; then
+  CleanRepoFiles
+fi
+
+IS_REGISTERED=`yum repolist 2>&1 | grep ica-base | wc -l`
+
+# -e => Set puppet environment variable.
+# -i => Set instance hostname
+# -m => Puppet master.
+# -r => Re-register with Spacewalk.
+# -s => Skip Puppet registration.
+# -t => Test mode.
+# -u => Install all available updates.
+# -h => Print usage.
+while getopts "e:i:m:rstuh" OPTION
+do
+  case $OPTION in
+    e) SetPuppetEnvironment $OPTARG;;
+    i) INSTANCE_HOSTNAME=$OPTARG;;
+    m) PUPPETMASTER_HOST=$OPTARG;;
+    r) RE_REGISTER=1
+       SKIP_PUPPET=1
+       ;;
+    s) SKIP_PUPPET=1;;
+    t) TEST=1;;
+    u) UPDATE=1;;
+    h) Usage "" 0;;
+    *) Usage "" 255;;
+  esac
+done
+
+SetActivationKey ${DISTRO} ${RELEASE_VERSION}
+
+if [[ ${TEST} -eq 1 ]]; then
+  echo "Test mode - Running CheckForUpdates only."
+  CheckForUpdates
+  exit 1
+elif [[ ${IS_REGISTERED} -gt 0 ]] && [[ ${RE_REGISTER} -eq 0 ]]; then
+  Echo "###################################################" "green"
+  Echo " This server is currently registered with          " "yellow" "bold"
+  Echo " Spacewalk and is running ${RELEASE}               " "yellow" "bold"
+  Echo "###################################################" "green"
+  echo
+  exit 0
+elif [[ ${HAS_REGISTERED} -gt 0 ]] && [[ ${RE_REGISTER} -eq 0 ]]; then
+  Echo "###################################################" "green"
+  Echo "    This server does not seem to be currently     " "red" "bold"
+  Echo "    registered with Spacewalk, but has been       " "red" "bold"
+  Echo "    registered in the past.  Check connectivity   " "red" "bold"
+  Echo "    to the Spacewalk server.                      " "red" "bold"
+  echo
+  Echo "    If you wish to re-register this server,       " "red" "bold"
+  Echo "    manually remove any entries from Spacewalk    " "red" "bold"
+  Echo "    and rerun this script with the -r option.     " "red" "bold"
+  Echo "###################################################" "green"
+  exit 0
+else
+  myhost=`hostname -s`
+
+  if [[ $myhost = "spacewalk" ]]; then
+     echo "This script should not be run on the spacewalk server itself in normal mode!"
+     exit 255
+  fi
+
+  echo
+  Echo "Normal mode enabled." "green"
+  echo
+  Echo "Testing for and/or installing required packages" "green"
+  echo
+  InstallPackage "wget"      "/usr/bin/wget" ${ARCH}
+  InstallPackage "gnupg"     "/usr/bin/gpg"  ${ARCH}
+  InstallPackage "iproute"   "/sbin/ip"      ${ARCH}
+  InstallPackage "coreutils" "/usr/bin/head" ${ARCH}
+  echo
+  Echo "Running SetInstanceHostName - assigning hostname" "green"
+  echo
+  SetInstanceHostName
+  echo
+  Echo "Running GetRepoFile - copying bootstrap repo" "green"
+  echo
+  GetRepoFile
+  echo
+  Echo "Running ImportKeys - importing GPG keys into rpm" "green"
+  echo
+  ImportKeys
+  echo
+  Echo "Running PrepareForSpacewalk - cleaning yum directories and installing required packages" "green"
+  echo
+  PrepareForSpacewalk
+  CleanRepoFiles
+  echo
+  Echo "Running RegisterWithSpacewalk - starting required services and registering with spacewalk" "green"
+  echo
+  RegisterWithSpacewalk
+  # To catch any repos installed by default packages
+  CleanRepoFiles
+  echo
+  Echo "Checking for updates" "green"
+  echo
+  CheckForUpdates
+  echo
+  Echo "Spacewalk registration complete. The server should now be attached to spacewalk." "green"
+  echo
+  UpdateHosts
+  PrepareForPuppet
+  echo
+  echo
+  RegisterWithPuppet
+  echo
+
+  exit 0
+fi

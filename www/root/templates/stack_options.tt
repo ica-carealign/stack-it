@@ -1,0 +1,72 @@
+<!-- TODO:  remove dependence on server side variables -->
+<div id="stackOptionsWrapper" class="instanceOptionsWrapper" hidden>
+  <div>
+    <table class="table">
+      <thead>
+        <tr>
+          <td colspan="2">
+            <h1>Stack Options</h1>
+          </td>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Stack Name:</td>
+          <td>
+            <input id="optionStackName"
+                   class="instanceTextCtl"
+                   type="text"
+                   maxlength=32
+                   data-bind="value: stackName,
+                              event: { keyup: StackNameOnChange }" />
+          </td>
+        </tr>
+        <tr>
+          <td>Add Full Stack:</td>
+          <td>
+            <select class="instanceSelectCtl"
+                    data-bind="options:      stackEnvironments,
+                               value:        stackEnvironment,
+                               optionsText:  'environmentName',
+                               optionsValue: 'value',
+                               event:        { change: StackEnvOnChange }">
+            </select>
+          </td>
+        </tr>
+        <tr>
+          <td>Description:</td>
+          <td>
+            <input id="stackDescription"
+                   class="instanceTextCtl"
+                   type="text"
+                   maxlength=1024
+                   data-bind="value: stackDescription"  />
+          </td>
+        </tr>
+        <tr>
+          <td>Schedule:</td>
+          <td>
+            <select name="StackSchedule"
+                    id="StackSchedule"
+                    class="instanceSelectCtl"
+                    data-bind="options:      schedules,
+                               value:        scheduleID,
+                               optionsText:  'description',
+                               optionsValue: 'value',
+                               event:        { change: StackScheduleOnChange }">
+            </select>
+          </td>
+        </tr>
+        <tr>
+          <td colspan="2">
+            <button id="stackBackButton"
+                    type="button"
+                    data-bind="click: closeStackOptions">Back</button>
+          </td>
+        </tr>
+      </tbody>
+      <tfoot>
+      </tfoot>
+    </table>
+  </div>
+</div>

@@ -1,0 +1,140 @@
+#!/usr/bin/env perl
+use strict;
+use warnings;
+use Cwd qw(abs_path);
+use FindBin qw($Script $Bin);
+use Getopt::Long qw(GetOptions);
+
+use StackIt::Env;
+use StackIt::DB::Config;
+use StackIt::Bin::Migrator;
+
+sub usage {
+  my $usage = qq(
+    Usage: $Script [OPTIONS]
+
+    Migrates the StackIt database up to the current schema version. The
+    database will be created if it does not already exist.
+
+    If you do not specify connection details, the default connection details
+    from @{[ StackIt::Env->ConfigDirectory ]} will be used.
+
+    Options:
+       -h | --help            : show this help message
+       -c | --color           : use colored output even if stdout is not a tty
+       -v | --verbose         : produce more verbose output (can be repeated)
+       -q | --quiet           : report errors only
+
+       -e | --environment env : StackIt environment name
+
+       -d | --database dbname : name of database to migrate
+       -u | --username user   : database username
+       -p | --password pass   : database password
+       -H | --host host       : database hostname
+       -P | --port port       : database tcp port number
+
+       -r | --roles           : load role definitions after migration
+
+       -D | --dump            : dump schema.sql and seed.sql (enabled by default in
+                                  the 'development' environment, and requires an
+                                  environment named 'snapshot' as a work area)
+
+    Only mysql is currently supported.
+  );
+  for ($usage) {
+    s/^\s+//s;
+    s/\s+$//s;
+    s/^ {4}//mg;
+  }
+  print STDERR "\n$usage\n\n";
+  exit(@_ ? shift : 1);
+}
+
+sub usageError {
+  my ($fmt,@param) = @_;
+  my $msg = @param ? sprintf($fmt,@param) : $fmt;
+  print STDERR "\n${msg}\n";
+  usage();
+}
+
+our ($Environment,$Database,$Username,$Password,$Host,$Port,$Dump,$Roles);
+our $Color = -t STDOUT;
+our $Verbosity = 1;
+
+Getopt::Long::Configure("bundling");
+GetOptions(
+  'h|help'          => sub { usage(0) },
+  'e|environment=s' => \$Environment,
+  'd|database=s'    => \$Database,
+  'u|username=s'    => \$Username,
+  'p|password=s'    => \$Password,
+  'H|host=s'        => \$Host,
+  'P|port=s'        => \$Port,
+  'c|color'         => \$Color,
+  'v|verbose'       => sub { $Verbosity++ },
+  'q|quiet'         => sub { $Verbosity = 0 },
+  'r|roles'         => \$Roles,
+  'D|dump'          => \$Dump,
+) || usage();
+
+if (defined($Environment) && grep { defined($_) } ($Database,$Host,$Port,$Username,$Password)) {
+  usageError("-e|--environment is mutually exclusive with "
+    . "-d|--database,-H|--host,-P|--port,-u|--username,-p|--password");
+}
+
+my $env = $Environment || StackIt::Env->Environment;
+if ($env eq 'development' && not defined($Dump)) {
+  # dump schema and seed data by default in development
+  $Dump = 1;
+}
+
+if (@ARGV) {
+  usageError("unrecognized arguments: @ARGV");
+}
+
+my $lang = $ENV{LANG} || $ENV{LC_ALL} || 'en-US';
+if ($lang =~ /\.utf-8?/i) {
+  binmode(STDOUT, ':utf8');
+  binmode(STDERR, ':utf8');
+}
+
+my $migrator = StackIt::Bin::Migrator->new(
+  environment   => $Environment,
+  database      => $Database,
+  username      => $Username,
+  password      => $Password,
+  host          => $Host,
+  port          => $Port,
+  wantColor     => $Color,
+  dataDirectory => abs_path("$Bin/../data"),
+  verbosity     => $Verbosity,
+);
+
+print STDERR "\n" if $Verbosity;
+
+my $ok = $migrator->migrate;
+
+if ($ok && $Roles) {
+  $migrator->loadRoles("$Bin/../role_definitions");
+}
+
+if ($ok && $Dump) {
+  our $SnapshotEnv = 'snapshot';
+  my $params = $migrator->dbConfig->connectionDetails($SnapshotEnv);
+  if (!$params || !$params->{database} || !$params->{username}) {
+    $migrator->error("DUMP", "database environment '$SnapshotEnv' is not configured ", -1);
+  }
+  else {
+    $migrator = StackIt::Bin::Migrator->new(
+      environment   => 'snapshot',
+      wantColor     => $Color,
+      dataDirectory => abs_path("$Bin/../data"),
+      verbosity     => $Verbosity - 1,
+    );
+    $ok = $migrator->createSnapshot;
+  }
+}
+
+print STDERR "\n" if $Verbosity;
+
+exit($ok ? 0 : 1);
